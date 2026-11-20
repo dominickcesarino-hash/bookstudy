@@ -169,6 +169,11 @@
   .tmeta{display:flex;gap:6px;flex-wrap:wrap}
   .tag{font-size:.72rem;font-weight:800;border-radius:999px;padding:2px 9px;background:#f3ede1;color:#6f675c}
   .tag.hot{background:var(--accent-soft);color:#9a4718}
+  .acc{margin-top:16px;border-radius:10px;padding:10px 12px;font-size:.88rem}
+  .acc-high{background:#e5f4ea;color:#1f5e33}.acc-medium{background:#fdf5d8;color:#6b5200}.acc-low{background:var(--accent-soft);color:#7a3a13}
+  .srcs{margin:0;padding-left:20px;font-size:.88rem}.srcs li{margin-bottom:4px}.srcs a{color:var(--brand)}
+  .move{position:absolute;top:14px;left:26px;font-size:.75rem;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.92)}
+  .move.up{color:#1f7a3a}.move.down{color:#b3261e}
   .study{border:0;border-radius:10px;padding:9px;background:var(--brand-soft);color:var(--brand);font-weight:800;cursor:pointer}
   .study:hover{background:var(--brand);color:#fff}
   @media (max-width:620px){.nav{gap:4px}.navbtn{padding:8px 7px;font-size:.88rem}.logo span{display:none}.pill{padding:6px 9px}}
@@ -222,14 +227,17 @@
           <option value="grades 9-12 (ages 14-18)">Grades 9–12</option>
         </select>
 
-        <label>How do you want to add the chapter?</label>
+        <label>How should Chapter Buddy read it?</label>
         <div class="tabs" role="tablist">
-          <button type="button" class="tab on" data-mode="text">📋 Paste text</button>
+          <button type="button" class="tab on" data-mode="title">✨ Look it up</button>
+          <button type="button" class="tab" data-mode="text">📋 Paste text</button>
           <button type="button" class="tab" data-mode="photo">📷 Photos</button>
-          <button type="button" class="tab" data-mode="title">💡 Title only</button>
         </div>
 
-        <div class="pane on" data-pane="text" style="margin-top:10px">
+        <div class="pane on" data-pane="title" style="margin-top:10px">
+          <div class="hint" style="margin-top:0">That's it. Just hit Summarize. Chapter Buddy searches the web for this chapter and only includes details it can confirm. For a rare book, or chapters numbered differently in your edition, paste the text or add photos for an exact summary.</div>
+        </div>
+        <div class="pane" data-pane="text" style="margin-top:10px">
           <textarea id="text" placeholder="Paste the chapter text here…"></textarea>
           <div class="hint" id="wordCount">0 words</div>
         </div>
@@ -241,10 +249,6 @@
           <input type="file" id="files" accept="image/*" multiple hidden>
           <div class="thumbs" id="thumbs"></div>
         </div>
-        <div class="pane" data-pane="title" style="margin-top:10px">
-          <div class="warn">Works best for well-known books. Without the actual pages the AI can get details wrong, so check it against your book.</div>
-        </div>
-
         <button class="go" id="go" type="submit">✨ Summarize chapter</button>
         <div class="quota" id="quota"></div>
       </form>
@@ -267,7 +271,7 @@
   <!-- TRENDING VIEW -->
   <div id="view-trending" class="wrap trending" hidden>
     <h2>🔥 Trending books</h2>
-    <p style="color:var(--muted);margin:6px 0 0">The books students are reading in class right now. Pick one to start studying it chapter by chapter.</p>
+    <p style="color:var(--muted);margin:6px 0 0">Ranked by how many chapters students summarized this week. Pick one to start studying it chapter by chapter.</p>
     <div class="tbar">
       <button class="gchip on" data-g="all">All grades</button>
       <button class="gchip" data-g="3-5">Grades 3–5</button>
@@ -312,7 +316,7 @@
 <script>
 /* ===================== SETTINGS ===================== */
 const CONFIG = {
-  FREE_PER_DAY: 3,                 // free summaries per day
+  FREE_PER_DAY: 5,                 // free summaries per day
   PREMIUM_URL: "",                 // paste your Stripe Payment Link here (e.g. https://buy.stripe.com/...)
   API_URL: "/api/summarize",       // Cloudflare Pages Function (see functions/api/summarize.js)
   MAX_PHOTOS: 8
@@ -345,15 +349,16 @@ const claudeReady = (window.claude && typeof window.claude.use === "function")
   ? window.claude.use("sample").then(s => { claudeSample = s; }).catch(()=>{})
   : Promise.resolve();
 
-async function callAI(prompt, images){
+async function callAI(prompt, images, book){
   await claudeReady;
   if (claudeSample){
+    lastSources = [];
     const r = await claudeSample(prompt, images.length ? { images: images.map(i => i.blob) } : {});
     return r.text;
   }
   const res = await fetch(CONFIG.API_URL, {
     method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ prompt, images: images.map(i => ({ mime:i.mime, data:i.b64 })) })
+    body: JSON.stringify({ prompt, book, ground: mode === "title", images: images.map(i => ({ mime:i.mime, data:i.b64 })) })
   });
   if (!res.ok){
     let msg = "The summarizer isn't reachable right now.";
@@ -361,14 +366,20 @@ async function callAI(prompt, images){
     throw new Error(msg);
   }
   const j = await res.json();
+  lastSources = j.sources || [];
   return j.text;
 }
+let lastSources = [];
 
 function buildPrompt({book, author, chapter, grade, mode, text, known}){
   const source =
-    mode === "text"  ? `Here is the full text of the chapter:\n"""\n${text}\n"""` :
-    mode === "photo" ? `The attached images are photos of the chapter's pages, in order. Read them carefully.` :
-                       `No text is provided. Use what you know about this book. If you don't know this chapter with confidence, say so in "confidenceNote" and keep details general rather than inventing them.`;
+    mode === "text"  ? `Here is the full text of the chapter:\n"""\n${text}\n"""\nUse ONLY this text. Do not add anything from other chapters or outside knowledge.` :
+    mode === "photo" ? `The attached images are photos of the chapter's pages, in order. Read them carefully and use ONLY what is on these pages.` :
+                       `No text is provided. Use Google Search to find reliable chapter-by-chapter summaries of this exact chapter (for example from study guides like SparkNotes, LitCharts, CliffsNotes, GradeSaver, or the publisher) and base everything on what those sources say about THIS chapter.
+Accuracy rules (very important):
+- Only include events, characters and details you can confirm from the sources for this specific chapter. Never invent or guess.
+- Do not mix up events from neighboring chapters. If sources disagree or number chapters differently (editions, parts, or named chapters), say so in "confidenceNote".
+- If you cannot confidently identify this chapter, set "confidence" to "low", keep the summary short and general, leave "keyEvents" and "newCharacters" empty, and explain in "confidenceNote".`;
   return `You are Chapter Buddy, a friendly reading tutor for students in ${grade}.
 Break down chapter "${chapter}" of the book "${book}"${author ? ` by ${author}` : ""}.
 
@@ -388,7 +399,8 @@ Reply with ONLY a JSON object, no markdown fences, in exactly this shape:
   "bigIdea": "the main theme or lesson of this chapter in one sentence",
   "vocab": [{"word": "a challenging word from the chapter", "meaning": "kid-friendly definition"}],
   "questions": ["3 discussion or quiz questions to check understanding"],
-  "confidenceNote": "empty string, or a short warning if you weren't sure of details"
+  "confidence": "high, medium, or low: how sure you are that every detail is correct for this exact chapter",
+  "confidenceNote": "empty string if high; otherwise a short note on what you weren't sure about"
 }
 Include 4-7 key events in story order and 3-5 vocab words.`;
 }
@@ -401,7 +413,7 @@ function parseJSON(t){
 }
 
 /* ===================== FORM ===================== */
-let mode = "text";
+let mode = "title";
 let photos = []; // {blob, mime, b64, url}
 const $ = id => document.getElementById(id);
 
@@ -464,18 +476,25 @@ $("form").addEventListener("submit", async e => {
   if (!isPremium() && usage() >= CONFIG.FREE_PER_DAY){ openModal(true); return; }
 
   const go = $("go"); go.disabled = true; go.textContent = "Reading…";
-  $("out").innerHTML = `<div class="loading"><div class="book-anim" style="font-size:2.6rem">📖</div><p><b>Reading chapter ${esc(chapter)} of ${esc(book)}…</b><br>Finding key events and new characters</p></div>`;
+  const steps = mode === "title"
+    ? [`Looking up chapter ${chapter} of ${book}…`, "Checking study guides…", "Finding key events…", "Spotting new characters…", "Double-checking details…"]
+    : [`Reading chapter ${chapter} of ${book}…`, "Finding key events…", "Spotting new characters…", "Writing your summary…"];
+  $("out").innerHTML = `<div class="loading"><div class="book-anim" style="font-size:2.6rem">📖</div><p><b id="stepTxt">${esc(steps[0])}</b><br><span style="font-size:.85rem">Usually takes 5–15 seconds</span></p></div>`;
+  let si = 0; const stepTimer = setInterval(() => { const el = $("stepTxt"); if (!el) return clearInterval(stepTimer); si = Math.min(si+1, steps.length-1); el.textContent = steps[si]; }, 2500);
   try{
     const known = knownCharacters(book);
     const prompt = buildPrompt({book, author, chapter, grade, mode, text: text.slice(0, 60000), known});
-    const raw = await callAI(prompt, mode === "photo" ? photos : []);
+    const raw = await callAI(prompt, mode === "photo" ? photos : [], book);
+    trendCounts = null; // refresh rankings next time Trending opens
     const result = parseJSON(raw);
+    if (lastSources.length) result.sources = lastSources;
     save(book, author, chapter, result);
     bump();
     renderResult(book, chapter, result);
   }catch(err){
     $("out").innerHTML = `<div class="err"><b>Something went wrong.</b><br>${esc(err.message || String(err))}</div>`;
   }finally{
+    clearInterval(stepTimer);
     go.disabled = false; go.textContent = "✨ Summarize chapter";
   }
 });
@@ -517,6 +536,15 @@ function highlight(text, newNames, oldNames){
   return html.replace(re, m => `<span class="hl-char${isNew[m] ? " hl-new" : ""}">${m}</span>`);
 }
 
+function accuracyBox(r){
+  const c = String(r.confidence || "").toLowerCase();
+  const level = c.startsWith("high") ? "high" : c.startsWith("low") ? "low" : c.startsWith("med") ? "medium" : "";
+  if (!level && !r.confidenceNote) return "";
+  const label = {high:"✅ High accuracy", medium:"🟡 Medium accuracy", low:"⚠️ Low accuracy"}[level] || "⚠️ Note";
+  const tip = level === "low" ? " For an exact summary, paste the chapter text or add photos of the pages." : "";
+  return `<div class="acc acc-${level || "low"}"><b>${label}</b>${r.confidenceNote || tip ? ` · ${esc(r.confidenceNote || "")}${tip}` : ""}</div>`;
+}
+
 function renderResult(book, chapter, r){
   const newNames = (r.newCharacters||[]).map(c => c.name);
   const oldNames = r.returningCharacters || [];
@@ -533,7 +561,7 @@ function renderResult(book, chapter, r){
         <button class="ghost" id="nbBtn">📚 My Books</button>
       </div>
     </div>
-    ${r.confidenceNote ? `<div class="warn" style="margin-top:16px">⚠️ ${esc(r.confidenceNote)}</div>` : ""}
+    ${accuracyBox(r)}
 
     <section class="block">
       <h3>📝 Summary</h3>
@@ -560,6 +588,7 @@ function renderResult(book, chapter, r){
 
     ${(r.vocab||[]).length ? `<section class="block"><h3>📖 Words to know</h3><div class="vocab">${r.vocab.map(v => `<div><b>${esc(v.word)}</b>${esc(v.meaning)}</div>`).join("")}</div></section>` : ""}
     ${(r.questions||[]).length ? `<section class="block"><h3>🤔 Check your understanding</h3><ol class="qs">${r.questions.map(q => `<li>${esc(q)}</li>`).join("")}</ol></section>` : ""}
+    ${(r.sources||[]).length ? `<section class="block"><h3>🔎 Sources checked</h3><ul class="srcs">${r.sources.map(s => `<li><a href="${esc(s.uri)}" target="_blank" rel="noopener">${esc(s.title || s.uri)}</a></li>`).join("")}</ul></section>` : ""}
   </div>`;
   $("copyBtn").onclick = () => copyNotes(book, chapter, r);
   $("nbBtn").onclick = () => show("notebook");
@@ -655,23 +684,52 @@ const TRENDING = [
 ];
 const gradeValue = {"3-5":"grades 3-5 (ages 8-10)","6-8":"grades 6-8 (ages 11-13)","9-12":"grades 9-12 (ages 14-18)"};
 let tGrade = "all";
+let trendCounts = null; // { "wonder": 12, ... } summaries per book over the last 7 days
+let prevRanks;          // ranks from the student's previous visit (read once per page load)
 
-function renderTrending(){
+async function loadTrendCounts(){
+  try{
+    const r = await fetch("/api/trending");
+    trendCounts = r.ok ? ((await r.json()).counts || {}) : {};
+  }catch(e){ trendCounts = {}; }
+}
+const countOf = b => (trendCounts && trendCounts[bookKey(b.t)]) || 0;
+
+// Overall ranking: most summaries this week first; ties keep the starting order (🔥 picks first).
+function rankedTrending(){
+  return TRENDING.map((b,i) => ({b, i}))
+    .sort((x,y) => countOf(y.b) - countOf(x.b) || (y.b.hot?1:0) - (x.b.hot?1:0) || x.i - y.i)
+    .map(x => x.b);
+}
+
+async function renderTrending(){
+  if (!trendCounts){
+    $("shelf").innerHTML = `<div class="card empty" style="grid-column:1/-1"><p>Loading this week's rankings…</p></div>`;
+    await loadTrendCounts();
+  }
+  const ranked = rankedTrending();
+  const rankOf = Object.fromEntries(ranked.map((b,i) => [b.t, i+1]));
+  // Compare with the ranks this student saw on their last visit to show ▲ / ▼ movement
+  if (prevRanks === undefined){ prevRanks = store.get("cb_ranks", null); }
+  store.set("cb_ranks", rankOf);
+  const prev = prevRanks;
   const q = $("tsearch").value.trim().toLowerCase();
-  const list = TRENDING
+  const list = ranked
     .filter(b => tGrade === "all" || b.g === tGrade)
-    .filter(b => !q || (b.t + " " + b.a).toLowerCase().includes(q))
-    .sort((x,y) => (y.hot?1:0) - (x.hot?1:0));
+    .filter(b => !q || (b.t + " " + b.a).toLowerCase().includes(q));
   if (!list.length){ $("shelf").innerHTML = `<div class="card empty" style="grid-column:1/-1"><h3>No books match</h3><p>Try another search, or type any book on the Summarize tab.</p></div>`; return; }
-  $("shelf").innerHTML = list.map((b,i) => {
+  $("shelf").innerHTML = list.map(b => {
     const c = color(b.t), saved = books[bookKey(b.t)];
     const n = saved ? Object.keys(saved.chapters).length : 0;
+    const r = rankOf[b.t], was = prev && prev[b.t], wk = countOf(b);
+    const move = !was || was === r ? "" :
+      was > r ? `<span class="move up">▲ ${was - r}</span>` : `<span class="move down">▼ ${r - was}</span>`;
     return `<div class="card tbook">
       <div class="cover" style="background:linear-gradient(160deg, ${c}, ${c}cc)">
-        <div class="rank">#${i+1}</div><b>${esc(b.t)}</b><span>${esc(b.a)}</span>
+        <div class="rank">#${r}</div>${move}<b>${esc(b.t)}</b><span>${esc(b.a)}</span>
       </div>
       <div class="tbody">
-        <div class="tmeta">${b.hot ? `<span class="tag hot">🔥 Trending</span>` : ""}<span class="tag">Grades ${b.g.replace("-","–")}</span>${n ? `<span class="tag">✓ ${n} ch. saved</span>` : ""}</div>
+        <div class="tmeta">${r <= 5 ? `<span class="tag hot">🔥 Top 5</span>` : ""}<span class="tag">Grades ${b.g.replace("-","–")}</span>${wk ? `<span class="tag">📈 ${wk} this week</span>` : ""}${n ? `<span class="tag">✓ ${n} ch. saved</span>` : ""}</div>
         <p>${esc(b.d)}</p>
         <button class="study" data-t="${esc(b.t)}">${n ? "Keep studying" : "Study this book"} →</button>
       </div>
