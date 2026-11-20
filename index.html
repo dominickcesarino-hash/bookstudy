@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter Buddy — Book &amp; Chapter Summaries for Students</title>
+<meta name="description" content="Paste a chapter or snap a photo of the pages. Chapter Buddy gives you a clear summary, the key events, and every new character introduced.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fbf7ef; --card:#ffffff; --ink:#23201c; --muted:#6f675c; --line:#e8dfcf;
+    --brand:#2f5d50; --brand-2:#e07a3f; --brand-soft:#e6efe9; --accent-soft:#fdebdc;
+    --char:#7a4fd1; --char-soft:#efe8fc; --event:#1f6fb2; --event-soft:#e3effa;
+    --radius:16px; --shadow:0 1px 2px rgba(35,32,28,.06),0 6px 24px rgba(35,32,28,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:Nunito,system-ui,sans-serif;background:var(--paper);color:var(--ink);line-height:1.55;font-size:16px}
+  h1,h2,h3{font-family:Fraunces,Georgia,serif;line-height:1.15;margin:0}
+  button,input,select,textarea{font:inherit;color:inherit}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+  /* header */
+  header{border-bottom:1px solid var(--line);background:rgba(251,247,239,.92);position:sticky;top:0;z-index:20;backdrop-filter:blur(6px)}
+  .nav{display:flex;align-items:center;gap:16px;height:64px}
+  .logo{display:flex;align-items:center;gap:10px;font-family:Fraunces,serif;font-weight:800;font-size:1.25rem;color:var(--brand);text-decoration:none}
+  .logo svg{flex:none}
+  .nav .spacer{flex:1}
+  .navbtn{background:none;border:0;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:700;color:var(--muted)}
+  .navbtn:hover,.navbtn.on{background:var(--brand-soft);color:var(--brand)}
+  .pill{font-size:.8rem;font-weight:800;padding:6px 12px;border-radius:999px;background:var(--accent-soft);color:#9a4718;border:0;cursor:pointer;white-space:nowrap}
+
+  /* hero */
+  .hero{padding:40px 0 8px}
+  .hero h1{font-size:clamp(2rem,4.4vw,3.1rem);max-width:780px;letter-spacing:-.01em}
+  .hero h1 em{font-style:normal;color:var(--brand-2)}
+  .hero p{color:var(--muted);font-size:1.1rem;max-width:620px;margin:12px 0 0}
+
+  .grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:24px;padding:28px 0 60px;align-items:start}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .form{padding:22px;position:sticky;top:84px}
+  @media (max-width:900px){.form{position:static}}
+  label{display:block;font-weight:800;font-size:.85rem;margin:14px 0 6px;color:#4a443c}
+  label:first-child{margin-top:0}
+  input[type=text],select,textarea{width:100%;border:1.5px solid var(--line);background:#fffdf9;border-radius:12px;padding:11px 12px;outline:none;transition:border .15s}
+  input[type=text]:focus,select:focus,textarea:focus{border-color:var(--brand)}
+  textarea{min-height:190px;resize:vertical;line-height:1.5}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hint{font-size:.8rem;color:var(--muted);margin-top:6px}
+
+  .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:#f3ede1;padding:4px;border-radius:12px}
+  .tab{border:0;background:none;padding:9px 6px;border-radius:9px;cursor:pointer;font-weight:800;font-size:.82rem;color:var(--muted)}
+  .tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .pane{display:none}.pane.on{display:block}
+
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;cursor:pointer;background:#fffdf9;color:var(--muted)}
+  .drop:hover,.drop.over{border-color:var(--brand);color:var(--brand)}
+  .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .thumbs figure{margin:0;position:relative}
+  .thumbs img{width:64px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+  .thumbs button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--ink);color:#fff;font-size:12px;cursor:pointer;line-height:20px;padding:0}
+  .warn{background:var(--accent-soft);color:#7a3a13;border-radius:10px;padding:10px 12px;font-size:.85rem}
+
+  .go{margin-top:18px;width:100%;border:0;border-radius:12px;padding:14px;background:var(--brand);color:#fff;font-weight:800;font-size:1.05rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}
+  .go:hover{background:#244a40}
+  .go:disabled{opacity:.6;cursor:wait}
+  .quota{text-align:center;font-size:.8rem;color:var(--muted);margin-top:10px}
+  .quota b{color:var(--ink)}
+
+  /* results */
+  .empty{padding:48px 28px;text-align:center;color:var(--muted)}
+  .empty h3{color:var(--ink);font-size:1.4rem;margin:14px 0 6px}
+  .legend{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .result{padding:26px}
+  .rhead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+  .kicker{font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-2)}
+  .rhead h2{font-size:1.75rem;margin-top:4px}
+  .tools{display:flex;gap:8px;flex-wrap:wrap}
+  .ghost{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;font-weight:700;font-size:.85rem;cursor:pointer}
+  .ghost:hover{border-color:var(--brand);color:var(--brand)}
+  section.block{margin-top:26px}
+  section.block h3{font-size:1.15rem;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .badge{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 7px;border-radius:999px;font-family:Nunito;font-size:.75rem;font-weight:800}
+  .summary{font-size:1.06rem}
+  .summary p{margin:0 0 10px}
+  .hl-char{background:var(--char-soft);color:var(--char);font-weight:800;padding:0 4px;border-radius:5px;white-space:nowrap}
+  .hl-new{box-shadow:inset 0 -2px 0 var(--char)}
+  .bigidea{background:var(--brand-soft);border-radius:12px;padding:14px 16px;margin-top:14px;display:flex;gap:10px}
+  .bigidea b{color:var(--brand)}
+
+  .timeline{list-style:none;margin:0;padding:0;position:relative}
+  .timeline:before{content:"";position:absolute;left:15px;top:6px;bottom:6px;width:2px;background:var(--event-soft)}
+  .timeline li{position:relative;padding:0 0 16px 48px}
+  .timeline .num{position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;background:var(--event);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+  .timeline .ev{font-weight:700}
+  .timeline .why{color:var(--muted);font-size:.92rem;margin-top:2px}
+
+  .chars{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .charcard{border:1.5px solid var(--char-soft);border-radius:14px;padding:14px;display:flex;gap:12px;background:#fdfbff}
+  .avatar{flex:none;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-family:Fraunces,serif;font-size:1.1rem}
+  .charcard h4{margin:0;font-size:1rem}
+  .role{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--char)}
+  .charcard p{margin:4px 0 0;font-size:.9rem;color:#4a443c}
+  .returning{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center;font-size:.85rem;color:var(--muted)}
+  .chip{background:#f3ede1;color:#4a443c;border-radius:999px;padding:3px 10px;font-weight:700;font-size:.82rem}
+
+  .vocab{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+  .vocab div{background:#fffaf2;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:.9rem}
+  .vocab b{display:block;font-family:Fraunces,serif;font-size:1rem}
+  .qs{margin:0;padding-left:20px}.qs li{margin-bottom:6px}
+
+  .loading{padding:60px 20px;text-align:center;color:var(--muted)}
+  .book-anim{display:inline-block;animation:flip 1.2s ease-in-out infinite}
+  @keyframes flip{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg) translateY(-4px)}}
+  .err{background:#fde8e8;color:#8a1f1f;border-radius:12px;padding:14px 16px;margin:20px}
+
+  /* notebook */
+  .notebook{padding:28px 0 60px}
+  .notebook h2{font-size:2rem}
+  .books{display:grid;gap:18px;margin-top:20px}
+  .book{padding:20px}
+  .book-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+  .book-head h3{font-size:1.35rem}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}
+  @media (max-width:760px){.cols{grid-template-columns:1fr}}
+  .chlist button{display:block;width:100%;text-align:left;border:1px solid var(--line);background:#fffdf9;border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;font-weight:700}
+  .chlist button:hover{border-color:var(--brand)}
+  .chlist small{display:block;color:var(--muted);font-weight:600}
+  table.roster{width:100%;border-collapse:collapse;font-size:.88rem}
+  .roster th{text-align:left;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--line)}
+  .roster td{padding:8px;border-bottom:1px solid #f1eadc;vertical-align:top}
+  .roster td:first-child{font-weight:800;color:var(--char);white-space:nowrap}
+
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(35,32,28,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .modal.on{display:flex}
+  .modal .card{max-width:440px;width:100%;padding:28px;position:relative}
+  .modal h2{font-size:1.6rem}
+  .price{font-family:Fraunces,serif;font-size:2.4rem;font-weight:800;color:var(--brand);margin:10px 0}
+  .price small{font-size:1rem;color:var(--muted);font-family:Nunito}
+  .perks{list-style:none;padding:0;margin:14px 0 20px}
+  .perks li{padding:6px 0 6px 28px;position:relative}
+  .perks li:before{content:"✓";position:absolute;left:4px;color:var(--brand);font-weight:800}
+  .x{position:absolute;top:12px;right:12px;border:0;background:none;font-size:1.4rem;cursor:pointer;color:var(--muted)}
+  footer{border-top:1px solid var(--line);padding:24px 0;color:var(--muted);font-size:.85rem;text-align:center}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+  .toast.on{opacity:1}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#summarize" data-view="summarize">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="12" height="22" rx="2" fill="#2f5d50"/><rect x="17" y="5" width="12" height="22" rx="2" fill="#e07a3f"/><path d="M16 7v20" stroke="#fbf7ef" stroke-width="2"/><circle cx="23" cy="13" r="2.2" fill="#fff"/><circle cx="9" cy="13" r="2.2" fill="#fff"/></svg>
+      Chapter Buddy
+    </a>
+    <div class="spacer"></div>
+    <button class="navbtn on" data-view="summarize">Summarize</button>
+    <button class="navbtn" data-view="notebook">My Books</button>
+    <button class="pill" id="premiumBtn">⭐ Go Premium</button>
+  </div>
+</header>
+
+<main>
+  <!-- SUMMARIZE VIEW -->
+  <div id="view-summarize" class="wrap">
+    <div class="hero">
+      <h1>Understand every chapter — <em>who's new, what happened,</em> and why it matters.</h1>
+      <p>Paste a chapter, snap a photo of the pages, or just type the book and chapter. Chapter Buddy explains it at your reading level.</p>
+    </div>
+
+    <div class="grid">
+      <form class="card form" id="form" autocomplete="off">
+        <label for="book">Book title</label>
+        <input type="text" id="book" list="bookList" placeholder="e.g. Wonder" required>
+        <datalist id="bookList"></datalist>
+
+        <div class="row">
+          <div>
+            <label for="author">Author <span style="font-weight:600;color:var(--muted)">(optional)</span></label>
+            <input type="text" id="author" placeholder="R. J. Palacio">
+          </div>
+          <div>
+            <label for="chapter">Chapter</label>
+            <input type="text" id="chapter" placeholder="e.g. 3 or “Part 2”" required>
+          </div>
+        </div>
+
+        <label for="grade">Explain it for</label>
+        <select id="grade">
+          <option value="grades 3-5 (ages 8-10)">Grades 3–5</option>
+          <option value="grades 6-8 (ages 11-13)" selected>Grades 6–8</option>
+          <option value="grades 9-12 (ages 14-18)">Grades 9–12</option>
+        </select>
+
+        <label>How do you want to add the chapter?</label>
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab on" data-mode="text">📋 Paste text</button>
+          <button type="button" class="tab" data-mode="photo">📷 Photos</button>
+          <button type="button" class="tab" data-mode="title">💡 Title only</button>
+        </div>
+
+        <div class="pane on" data-pane="text" style="margin-top:10px">
+          <textarea id="text" placeholder="Paste the chapter text here…"></textarea>
+          <div class="hint" id="wordCount">0 words</div>
+        </div>
+        <div class="pane" data-pane="photo" style="margin-top:10px">
+          <div class="drop" id="drop">
+            <div style="font-size:1.6rem">📷</div>
+            <b>Tap to add photos of the pages</b><br><span style="font-size:.85rem">or drag them here · up to 8 pages</span>
+          </div>
+          <input type="file" id="files" accept="image/*" multiple hidden>
+          <div class="thumbs" id="thumbs"></div>
+        </div>
+        <div class="pane" data-pane="title" style="margin-top:10px">
+          <div class="warn">Works best for well-known books. Without the actual pages the AI can get details wrong, so check it against your book.</div>
+        </div>
+
+        <button class="go" id="go" type="submit">✨ Summarize chapter</button>
+        <div class="quota" id="quota"></div>
+      </form>
+
+      <div class="card" id="out">
+        <div class="empty">
+          <svg width="120" height="90" viewBox="0 0 120 90" aria-hidden="true"><path d="M10 15 Q35 5 60 15 V82 Q35 72 10 82Z" fill="#e6efe9" stroke="#2f5d50" stroke-width="2"/><path d="M110 15 Q85 5 60 15 V82 Q85 72 110 82Z" fill="#fdebdc" stroke="#e07a3f" stroke-width="2"/><path d="M20 30h28M20 40h30M20 50h24M72 30h28M70 40h30M72 50h22" stroke="#bcae95" stroke-width="2.5" stroke-linecap="round"/></svg>
+          <h3>Your chapter breakdown shows up here</h3>
+          <p>You'll get a short summary, the key events in order, and a card for every character introduced.</p>
+          <div class="legend">
+            <span class="chip" style="background:var(--event-soft);color:var(--event)">① Key events</span>
+            <span class="chip" style="background:var(--char-soft);color:var(--char)">New characters</span>
+            <span class="chip" style="background:var(--brand-soft);color:var(--brand)">Big idea</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTEBOOK VIEW -->
+  <div id="view-notebook" class="wrap notebook" hidden>
+    <h2>My Books</h2>
+    <p style="color:var(--muted);margin:6px 0 0">Every chapter you summarize is saved here, with a running list of characters and the chapter they first appeared in. Saved on this device only.</p>
+    <div class="books" id="books"></div>
+  </div>
+</main>
+
+<footer>
+  Chapter Buddy helps you understand what you read; it doesn't replace reading it. AI can make mistakes, so double-check names and details with your book.
+</footer>
+
+<div class="modal" id="modal">
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <button class="x" id="mClose" aria-label="Close">×</button>
+    <div class="kicker">Chapter Buddy Premium</div>
+    <h2 id="mTitle">Unlimited summaries</h2>
+    <div class="price">$5<small> / month</small></div>
+    <ul class="perks">
+      <li>Unlimited chapter summaries (free is <span class="freeN"></span>/day)</li>
+      <li>Photo uploads of up to 8 pages at a time</li>
+      <li>Study questions and vocabulary for every chapter</li>
+      <li>Character tracker across the whole book</li>
+    </ul>
+    <a class="go" id="mBuy" href="#" target="_blank" rel="noopener" style="text-decoration:none">Start Premium</a>
+    <div class="quota" id="mNote"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== SETTINGS ===================== */
+const CONFIG = {
+  FREE_PER_DAY: 3,                 // free summaries per day
+  PREMIUM_URL: "",                 // paste your Stripe Payment Link here (e.g. https://buy.stripe.com/...)
+  API_URL: "/api/summarize",       // Cloudflare Pages Function (see functions/api/summarize.js)
+  MAX_PHOTOS: 8
+};
+
+/* ===================== STORAGE ===================== */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+let books = store.get("cb_books", {});   // { key: {title, author, chapters:{chKey:{chapter, result, date}}} }
+const bookKey = t => t.trim().toLowerCase().replace(/\s+/g," ");
+
+/* ===================== QUOTA ===================== */
+function today(){ return new Date().toISOString().slice(0,10); }
+function usage(){ const u = store.get("cb_usage", {}); return u.day === today() ? u.n : 0; }
+function bump(){ store.set("cb_usage", {day: today(), n: usage()+1}); renderQuota(); }
+function isPremium(){ return store.get("cb_premium", false); }
+function renderQuota(){
+  const q = document.getElementById("quota");
+  if (isPremium()){ q.innerHTML = "⭐ <b>Premium</b> · unlimited summaries"; return; }
+  const left = Math.max(0, CONFIG.FREE_PER_DAY - usage());
+  q.innerHTML = `<b>${left}</b> of ${CONFIG.FREE_PER_DAY} free summaries left today`;
+}
+
+/* ===================== AI BACKENDS ===================== */
+// 1) Claude (when the page runs as a Claude artifact)  2) your own /api/summarize (Gemini, free tier)
+let claudeSample = null;
+const claudeReady = (window.claude && typeof window.claude.use === "function")
+  ? window.claude.use("sample").then(s => { claudeSample = s; }).catch(()=>{})
+  : Promise.resolve();
+
+async function callAI(prompt, images){
+  await claudeReady;
+  if (claudeSample){
+    const r = await claudeSample(prompt, images.length ? { images: images.map(i => i.blob) } : {});
+    return r.text;
+  }
+  const res = await fetch(CONFIG.API_URL, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ prompt, images: images.map(i => ({ mime:i.mime, data:i.b64 })) })
+  });
+  if (!res.ok){
+    let msg = "The summarizer isn't reachable right now.";
+    try{ const j = await res.json(); if (j.error) msg = j.error; }catch(e){}
+    throw new Error(msg);
+  }
+  const j = await res.json();
+  return j.text;
+}
+
+function buildPrompt({book, author, chapter, grade, mode, text, known}){
+  const source =
+    mode === "text"  ? `Here is the full text of the chapter:\n"""\n${text}\n"""` :
+    mode === "photo" ? `The attached images are photos of the chapter's pages, in order. Read them carefully.` :
+                       `No text is provided. Use what you know about this book. If you don't know this chapter with confidence, say so in "confidenceNote" and keep details general rather than inventing them.`;
+  return `You are Chapter Buddy, a friendly reading tutor for students in ${grade}.
+Break down chapter "${chapter}" of the book "${book}"${author ? ` by ${author}` : ""}.
+
+${source}
+
+Characters already introduced in earlier chapters the student has summarized: ${known.length ? known.join(", ") : "(none recorded yet)"}.
+A "new character" is someone who appears or is first named in THIS chapter and is not in that list. Characters from that list who appear in this chapter go in "returningCharacters".
+
+Write for ${grade}: clear, warm, concrete, no spoilers beyond this chapter.
+Reply with ONLY a JSON object, no markdown fences, in exactly this shape:
+{
+  "chapterTitle": "the chapter's title if it has one, else empty string",
+  "summary": "3-5 short paragraphs separated by \\n\\n",
+  "keyEvents": [{"event": "what happened, one sentence", "why": "why it matters to the story, one sentence"}],
+  "newCharacters": [{"name": "name as written in the book", "role": "e.g. narrator, friend, teacher, antagonist", "description": "who they are and what they do in this chapter, 1-2 sentences"}],
+  "returningCharacters": ["names"],
+  "bigIdea": "the main theme or lesson of this chapter in one sentence",
+  "vocab": [{"word": "a challenging word from the chapter", "meaning": "kid-friendly definition"}],
+  "questions": ["3 discussion or quiz questions to check understanding"],
+  "confidenceNote": "empty string, or a short warning if you weren't sure of details"
+}
+Include 4-7 key events in story order and 3-5 vocab words.`;
+}
+
+function parseJSON(t){
+  t = (t || "").trim().replace(/^```(?:json)?\s*/i,"").replace(/```\s*$/,"");
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a < 0 || b < 0) throw new Error("The summary came back in an unexpected format. Please try again.");
+  return JSON.parse(t.slice(a, b+1));
+}
+
+/* ===================== FORM ===================== */
+let mode = "text";
+let photos = []; // {blob, mime, b64, url}
+const $ = id => document.getElementById(id);
+
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  mode = t.dataset.mode;
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.dataset.pane === mode));
+}));
+
+$("text").addEventListener("input", e => {
+  const n = (e.target.value.trim().match(/\S+/g) || []).length;
+  $("wordCount").textContent = `${n.toLocaleString()} words`;
+});
+
+const drop = $("drop");
+drop.addEventListener("click", () => $("files").click());
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); });
+$("files").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
+
+async function shrink(file){
+  // downscale big phone photos so uploads stay fast
+  const url = URL.createObjectURL(file);
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+  const max = 1600, s = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement("canvas"); c.width = Math.round(img.width*s); c.height = Math.round(img.height*s);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+  const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(",")[1]); fr.readAsDataURL(blob); });
+  return { blob, mime:"image/jpeg", b64, url: URL.createObjectURL(blob) };
+}
+async function addFiles(list){
+  for (const f of list){
+    if (!f.type.startsWith("image/")) continue;
+    if (photos.length >= CONFIG.MAX_PHOTOS){ toast(`Up to ${CONFIG.MAX_PHOTOS} pages at a time`); break; }
+    try{ photos.push(await shrink(f)); }catch(e){ toast("Couldn't read one of those images"); }
+  }
+  renderThumbs();
+}
+function renderThumbs(){
+  $("thumbs").innerHTML = photos.map((p,i) => `<figure><img src="${p.url}" alt="Page ${i+1}"><button type="button" data-i="${i}" aria-label="Remove page ${i+1}">×</button></figure>`).join("");
+  $("thumbs").querySelectorAll("button").forEach(b => b.onclick = () => { photos.splice(+b.dataset.i,1); renderThumbs(); });
+}
+
+function knownCharacters(book){
+  const b = books[bookKey(book)]; if (!b) return [];
+  const names = new Set();
+  Object.values(b.chapters).forEach(c => (c.result.newCharacters||[]).forEach(n => names.add(n.name)));
+  return [...names];
+}
+
+$("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const book = $("book").value.trim(), chapter = $("chapter").value.trim();
+  const author = $("author").value.trim(), grade = $("grade").value, text = $("text").value.trim();
+  if (!book || !chapter) return;
+  if (mode === "text" && text.split(/\s+/).length < 40){ toast("Paste a bit more of the chapter (at least a few paragraphs)"); return; }
+  if (mode === "photo" && !photos.length){ toast("Add at least one photo of the pages"); return; }
+  if (!isPremium() && usage() >= CONFIG.FREE_PER_DAY){ openModal(true); return; }
+
+  const go = $("go"); go.disabled = true; go.textContent = "Reading…";
+  $("out").innerHTML = `<div class="loading"><div class="book-anim" style="font-size:2.6rem">📖</div><p><b>Reading chapter ${esc(chapter)} of ${esc(book)}…</b><br>Finding key events and new characters</p></div>`;
+  try{
+    const known = knownCharacters(book);
+    const prompt = buildPrompt({book, author, chapter, grade, mode, text: text.slice(0, 60000), known});
+    const raw = await callAI(prompt, mode === "photo" ? photos : []);
+    const result = parseJSON(raw);
+    save(book, author, chapter, result);
+    bump();
+    renderResult(book, chapter, result);
+  }catch(err){
+    $("out").innerHTML = `<div class="err"><b>Something went wrong.</b><br>${esc(err.message || String(err))}</div>`;
+  }finally{
+    go.disabled = false; go.textContent = "✨ Summarize chapter";
+  }
+});
+
+function save(book, author, chapter, result){
+  const k = bookKey(book);
+  books[k] = books[k] || { title: book, author, chapters:{} };
+  if (author) books[k].author = author;
+  books[k].chapters[chapter.toLowerCase()] = { chapter, result, date: Date.now() };
+  store.set("cb_books", books);
+  refreshBookList();
+}
+function refreshBookList(){
+  $("bookList").innerHTML = Object.values(books).map(b => `<option value="${esc(b.title)}">`).join("");
+}
+
+/* ===================== RENDER ===================== */
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+const palette = ["#7a4fd1","#1f6fb2","#2f5d50","#e07a3f","#b0407a","#3f7d20","#8a5a00","#3b5bdb"];
+function color(name){ let h=0; for (const c of name) h = (h*31 + c.charCodeAt(0)) >>> 0; return palette[h % palette.length]; }
+function initials(n){ return n.split(/\s+/).filter(Boolean).slice(0,2).map(w => w[0]).join("").toUpperCase(); }
+
+function highlight(text, newNames, oldNames){
+  let html = esc(text);
+  const all = [...newNames.map(n => [n,true]), ...oldNames.map(n => [n,false])]
+    .filter(([n]) => n && n.length > 1).sort((a,b) => b[0].length - a[0].length);
+  // match full names and first names, longest first, without touching already-wrapped text
+  const terms = [];
+  all.forEach(([n,isNew]) => {
+    terms.push([n,isNew]);
+    const first = n.split(/\s+/)[0];
+    if (first !== n && first.length > 2 && !/^(the|mr|mrs|ms|dr|miss|aunt|uncle)\.?$/i.test(first)) terms.push([first,isNew]);
+  });
+  const seen = new Set();
+  const list = terms.filter(([t]) => !seen.has(t.toLowerCase()) && seen.add(t.toLowerCase()));
+  if (!list.length) return html;
+  const re = new RegExp("\\b(" + list.map(([t]) => esc(t).replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|") + ")\\b", "g");
+  const isNew = Object.fromEntries(list.map(([t,n]) => [esc(t), n]));
+  return html.replace(re, m => `<span class="hl-char${isNew[m] ? " hl-new" : ""}">${m}</span>`);
+}
+
+function renderResult(book, chapter, r){
+  const newNames = (r.newCharacters||[]).map(c => c.name);
+  const oldNames = r.returningCharacters || [];
+  const paras = String(r.summary||"").split(/\n\s*\n/).filter(Boolean);
+  $("out").innerHTML = `
+  <div class="result">
+    <div class="rhead">
+      <div>
+        <div class="kicker">${esc(book)} · Chapter ${esc(chapter)}</div>
+        <h2>${esc(r.chapterTitle || "Chapter " + chapter)}</h2>
+      </div>
+      <div class="tools">
+        <button class="ghost" id="copyBtn">📋 Copy notes</button>
+        <button class="ghost" id="nbBtn">📚 My Books</button>
+      </div>
+    </div>
+    ${r.confidenceNote ? `<div class="warn" style="margin-top:16px">⚠️ ${esc(r.confidenceNote)}</div>` : ""}
+
+    <section class="block">
+      <h3>📝 Summary</h3>
+      <div class="summary">${paras.map(p => `<p>${highlight(p, newNames, oldNames)}</p>`).join("")}</div>
+      ${r.bigIdea ? `<div class="bigidea"><span>💡</span><div><b>Big idea:</b> ${esc(r.bigIdea)}</div></div>` : ""}
+    </section>
+
+    <section class="block">
+      <h3>🎯 Key events <span class="badge" style="background:var(--event-soft);color:var(--event)">${(r.keyEvents||[]).length}</span></h3>
+      <ol class="timeline">
+        ${(r.keyEvents||[]).map((k,i) => `<li><span class="num">${i+1}</span><div class="ev">${highlight(k.event, newNames, oldNames)}</div>${k.why ? `<div class="why">Why it matters: ${esc(k.why)}</div>` : ""}</li>`).join("")}
+      </ol>
+    </section>
+
+    <section class="block">
+      <h3>🧑‍🤝‍🧑 New characters introduced <span class="badge" style="background:var(--char-soft);color:var(--char)">${newNames.length}</span></h3>
+      ${newNames.length ? `<div class="chars">${r.newCharacters.map(c => `
+        <div class="charcard">
+          <div class="avatar" style="background:${color(c.name)}">${esc(initials(c.name))}</div>
+          <div><h4>${esc(c.name)}</h4>${c.role ? `<div class="role">${esc(c.role)}</div>` : ""}<p>${esc(c.description)}</p></div>
+        </div>`).join("")}</div>` : `<p style="color:var(--muted);margin:0">No new characters in this chapter.</p>`}
+      ${oldNames.length ? `<div class="returning">Also in this chapter: ${oldNames.map(n => `<span class="chip">${esc(n)}</span>`).join("")}</div>` : ""}
+    </section>
+
+    ${(r.vocab||[]).length ? `<section class="block"><h3>📖 Words to know</h3><div class="vocab">${r.vocab.map(v => `<div><b>${esc(v.word)}</b>${esc(v.meaning)}</div>`).join("")}</div></section>` : ""}
+    ${(r.questions||[]).length ? `<section class="block"><h3>🤔 Check your understanding</h3><ol class="qs">${r.questions.map(q => `<li>${esc(q)}</li>`).join("")}</ol></section>` : ""}
+  </div>`;
+  $("copyBtn").onclick = () => copyNotes(book, chapter, r);
+  $("nbBtn").onclick = () => show("notebook");
+}
+
+function notesText(book, chapter, r){
+  return [
+    `${book} — Chapter ${chapter}${r.chapterTitle ? ": " + r.chapterTitle : ""}`, "",
+    "SUMMARY", r.summary, "",
+    r.bigIdea ? "BIG IDEA: " + r.bigIdea + "\n" : "",
+    "KEY EVENTS", ...(r.keyEvents||[]).map((k,i) => `${i+1}. ${k.event}${k.why ? " (Why it matters: " + k.why + ")" : ""}`), "",
+    "NEW CHARACTERS", ...((r.newCharacters||[]).length ? r.newCharacters.map(c => `- ${c.name}${c.role ? " (" + c.role + ")" : ""}: ${c.description}`) : ["- none"]),
+    (r.returningCharacters||[]).length ? "\nALSO IN THIS CHAPTER: " + r.returningCharacters.join(", ") : "",
+    (r.vocab||[]).length ? "\nWORDS TO KNOW\n" + r.vocab.map(v => `- ${v.word}: ${v.meaning}`).join("\n") : ""
+  ].join("\n");
+}
+async function copyNotes(book, chapter, r){
+  try{ await navigator.clipboard.writeText(notesText(book, chapter, r)); toast("Notes copied!"); }
+  catch(e){ toast("Couldn't copy. Select the text and copy it instead"); }
+}
+
+/* ===================== NOTEBOOK ===================== */
+function renderNotebook(){
+  const list = Object.values(books);
+  if (!list.length){
+    $("books").innerHTML = `<div class="card empty"><h3>No books yet</h3><p>Summarize your first chapter and it will appear here.</p></div>`;
+    return;
+  }
+  $("books").innerHTML = list.map((b, bi) => {
+    const chs = Object.values(b.chapters).sort((x,y) => String(x.chapter).localeCompare(String(y.chapter), undefined, {numeric:true}));
+    const roster = [];
+    const seen = new Set();
+    chs.forEach(c => (c.result.newCharacters||[]).forEach(n => { if (!seen.has(n.name.toLowerCase())){ seen.add(n.name.toLowerCase()); roster.push({...n, ch:c.chapter}); } }));
+    return `<div class="card book">
+      <div class="book-head">
+        <div><h3>${esc(b.title)}</h3><div style="color:var(--muted)">${b.author ? esc(b.author) + " · " : ""}${chs.length} chapter${chs.length===1?"":"s"} · ${roster.length} characters</div></div>
+        <button class="ghost" data-del="${bi}">Delete book</button>
+      </div>
+      <div class="cols">
+        <div class="chlist"><label style="margin-top:0">Chapters</label>
+          ${chs.map(c => `<button data-b="${bi}" data-c="${esc(c.chapter)}">Chapter ${esc(c.chapter)}${c.result.chapterTitle ? ": " + esc(c.result.chapterTitle) : ""}<small>${(c.result.keyEvents||[]).length} key events · ${(c.result.newCharacters||[]).length} new characters</small></button>`).join("")}
+        </div>
+        <div><label style="margin-top:0">Character tracker</label>
+          ${roster.length ? `<table class="roster"><thead><tr><th>Character</th><th>First seen</th><th>Who they are</th></tr></thead><tbody>
+            ${roster.map(n => `<tr><td>${esc(n.name)}</td><td>Ch. ${esc(n.ch)}</td><td>${esc(n.role ? n.role + " · " : "")}${esc(n.description)}</td></tr>`).join("")}
+          </tbody></table>` : `<p style="color:var(--muted)">No characters yet.</p>`}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  $("books").querySelectorAll("[data-c]").forEach(btn => btn.onclick = () => {
+    const b = list[+btn.dataset.b], c = b.chapters[btn.dataset.c.toLowerCase()];
+    show("summarize"); renderResult(b.title, c.chapter, c.result);
+    $("book").value = b.title; $("author").value = b.author || "";
+  });
+  $("books").querySelectorAll("[data-del]").forEach(btn => {
+    let armed = false;
+    btn.onclick = () => {
+      if (!armed){ armed = true; btn.textContent = "Tap again to delete"; setTimeout(() => { armed = false; btn.textContent = "Delete book"; }, 3000); return; }
+      const b = list[+btn.dataset.del]; delete books[bookKey(b.title)]; store.set("cb_books", books); refreshBookList(); renderNotebook();
+    };
+  });
+}
+
+/* ===================== VIEWS / MODAL / TOAST ===================== */
+function show(v){
+  $("view-summarize").hidden = v !== "summarize";
+  $("view-notebook").hidden = v !== "notebook";
+  document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  if (v === "notebook") renderNotebook();
+  try{ history.replaceState(null, "", "#" + v); }catch(e){}
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", e => { e.preventDefault(); show(b.dataset.view); }));
+window.addEventListener("hashchange", () => show(location.hash === "#notebook" ? "notebook" : "summarize"));
+
+function openModal(limitHit){
+  document.querySelectorAll(".freeN").forEach(s => s.textContent = CONFIG.FREE_PER_DAY);
+  $("mTitle").textContent = limitHit ? "You've used today's free summaries" : "Unlimited summaries";
+  const buy = $("mBuy");
+  if (CONFIG.PREMIUM_URL){ buy.href = CONFIG.PREMIUM_URL; $("mNote").textContent = "Cancel anytime."; }
+  else { buy.removeAttribute("href"); buy.style.opacity = .6; $("mNote").textContent = "Premium sign-up is coming soon. Free summaries reset tomorrow."; }
+  $("modal").classList.add("on");
+}
+$("premiumBtn").onclick = () => openModal(false);
+$("mClose").onclick = () => $("modal").classList.remove("on");
+$("modal").addEventListener("click", e => { if (e.target.id === "modal") $("modal").classList.remove("on"); });
+
+let tt; function toast(m){ const t = $("toast"); t.textContent = m; t.classList.add("on"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("on"), 2600); }
+
+refreshBookList(); renderQuota();
+if (location.hash === "#notebook") show("notebook");
+</script>
+</body>
+</html>
