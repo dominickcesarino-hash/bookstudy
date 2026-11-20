@@ -8,9 +8,11 @@
 // Free-tier models, tried in order. If Google retires one, the next is used.
 // "think" keeps reasoning short so answers come back fast.
 const MODELS = [
-  { name: "gemini-flash-latest", think: { thinkingLevel: "low" } },
-  { name: "gemini-2.5-flash",    think: { thinkingBudget: 512 } },
-  { name: "gemini-2.0-flash",    think: null }
+  { name: "gemini-2.5-flash",         think: { thinkingBudget: 512 } },
+  { name: "gemini-2.5-flash-lite",    think: { thinkingBudget: 512 } },
+  { name: "gemini-flash-latest",      think: { thinkingLevel: "low" } },
+  { name: "gemini-flash-lite-latest", think: null },
+  { name: "gemini-2.0-flash",         think: null }
 ];
 
 export async function onRequestPost({ request, env, waitUntil }) {
@@ -42,9 +44,12 @@ export async function onRequestPost({ request, env, waitUntil }) {
     return JSON.stringify(req);
   };
 
+  // Optional: { model: "<name>" } tries just that model from the list above (used for speed testing).
+  const chosen = MODELS.filter(m => !body.model || m.name === body.model);
+
   let res, data, detail = "", used = "";
   outer:
-  for (const model of MODELS) {
+  for (const model of chosen.length ? chosen : MODELS) {
     // Try with the fast-thinking setting first; if this model rejects it (400), retry once without it.
     for (const think of model.think ? [model.think, null] : [null]) {
       res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model.name}:generateContent`, {
@@ -56,10 +61,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
       try { detail = (await res.json()).error?.message || ""; } catch { detail = ""; }
       if (res.status !== 400) break;
     }
-    if (res.status !== 404 && res.status !== 400) break; // only move to the next model if this one is missing or incompatible
+    // Move to the next model if this one is missing, incompatible, or out of free quota.
+    if (![400, 404, 429].includes(res.status)) break;
   }
 
-  if (res.status === 429) return json({ error: "Lots of students are using Chapter Buddy right now. Try again in a minute." }, 429);
+  if (res.status === 429) return json({ error: "Lots of students are using Chapter Buddy right now. Try again in a minute.", detail: detail.slice(0, 300) }, 429);
   if (!res.ok) return json({ error: "The summarizer had a problem. Please try again.", detail: `${res.status} ${detail}`.slice(0, 300) }, 502);
 
   data = await res.json();
