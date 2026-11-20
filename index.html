@@ -200,7 +200,7 @@
   <div id="view-summarize" class="wrap">
     <div class="hero">
       <h1>Understand every chapter — <em>who's new, what happened,</em> and why it matters.</h1>
-      <p>Paste a chapter, snap a photo of the pages, or just type the book and chapter. Chapter Buddy explains it at your reading level.</p>
+      <p>Just type the book, author, and chapter. Chapter Buddy does the rest and explains it at your reading level. You can also paste the text or snap photos of the pages.</p>
     </div>
 
     <div class="grid">
@@ -235,7 +235,7 @@
         </div>
 
         <div class="pane on" data-pane="title" style="margin-top:10px">
-          <div class="hint" style="margin-top:0">That's it. Just hit Summarize. Chapter Buddy searches the web for this chapter and only includes details it can confirm. For a rare book, or chapters numbered differently in your edition, paste the text or add photos for an exact summary.</div>
+          <div class="hint" style="margin-top:0">That's it. Just hit Summarize. Chapter Buddy finds the chapter from what it knows about the book, only includes details it's sure of, and rates how accurate the summary is. For a less famous book, or if your edition numbers chapters differently, paste the text or add photos for an exact summary.</div>
         </div>
         <div class="pane" data-pane="text" style="margin-top:10px">
           <textarea id="text" placeholder="Paste the chapter text here…"></textarea>
@@ -375,7 +375,7 @@ function buildPrompt({book, author, chapter, grade, mode, text, known}){
   const source =
     mode === "text"  ? `Here is the full text of the chapter:\n"""\n${text}\n"""\nUse ONLY this text. Do not add anything from other chapters or outside knowledge.` :
     mode === "photo" ? `The attached images are photos of the chapter's pages, in order. Read them carefully and use ONLY what is on these pages.` :
-                       `No text is provided. Use Google Search to find reliable chapter-by-chapter summaries of this exact chapter (for example from study guides like SparkNotes, LitCharts, CliffsNotes, GradeSaver, or the publisher) and base everything on what those sources say about THIS chapter.
+                       `No text is provided. If you have a search tool, use it to find reliable chapter-by-chapter summaries of this exact chapter (study guides like SparkNotes, LitCharts, CliffsNotes, GradeSaver) and base everything on them. Otherwise rely only on what you reliably know about this book.
 Accuracy rules (very important):
 - Only include events, characters and details you can confirm from the sources for this specific chapter. Never invent or guess.
 - Do not mix up events from neighboring chapters. If sources disagree or number chapters differently (editions, parts, or named chapters), say so in "confidenceNote".
@@ -389,8 +389,9 @@ Characters already introduced in earlier chapters the student has summarized: ${
 A "new character" is someone who appears or is first named in THIS chapter and is not in that list. Characters from that list who appear in this chapter go in "returningCharacters".
 
 Write for ${grade}: clear, warm, concrete, no spoilers beyond this chapter.
-Reply with ONLY a JSON object, no markdown fences, in exactly this shape:
+Reply with ONLY a JSON object, no markdown fences, in exactly this shape. Every key is required, including "confidence":
 {
+  "confidence": "high, medium, or low: how sure you are that every detail is correct for this exact chapter",
   "chapterTitle": "the chapter's title if it has one, else empty string",
   "summary": "3-5 short paragraphs separated by \\n\\n",
   "keyEvents": [{"event": "what happened, one sentence", "why": "why it matters to the story, one sentence"}],
@@ -399,7 +400,6 @@ Reply with ONLY a JSON object, no markdown fences, in exactly this shape:
   "bigIdea": "the main theme or lesson of this chapter in one sentence",
   "vocab": [{"word": "a challenging word from the chapter", "meaning": "kid-friendly definition"}],
   "questions": ["3 discussion or quiz questions to check understanding"],
-  "confidence": "high, medium, or low: how sure you are that every detail is correct for this exact chapter",
   "confidenceNote": "empty string if high; otherwise a short note on what you weren't sure about"
 }
 Include 4-7 key events in story order and 3-5 vocab words.`;
@@ -477,9 +477,9 @@ $("form").addEventListener("submit", async e => {
 
   const go = $("go"); go.disabled = true; go.textContent = "Reading…";
   const steps = mode === "title"
-    ? [`Looking up chapter ${chapter} of ${book}…`, "Checking study guides…", "Finding key events…", "Spotting new characters…", "Double-checking details…"]
+    ? [`Looking up chapter ${chapter} of ${book}…`, "Finding key events…", "Spotting new characters…", "Double-checking details…"]
     : [`Reading chapter ${chapter} of ${book}…`, "Finding key events…", "Spotting new characters…", "Writing your summary…"];
-  $("out").innerHTML = `<div class="loading"><div class="book-anim" style="font-size:2.6rem">📖</div><p><b id="stepTxt">${esc(steps[0])}</b><br><span style="font-size:.85rem">Usually takes 5–15 seconds</span></p></div>`;
+  $("out").innerHTML = `<div class="loading"><div class="book-anim" style="font-size:2.6rem">📖</div><p><b id="stepTxt">${esc(steps[0])}</b><br><span style="font-size:.85rem">Usually takes a few seconds</span></p></div>`;
   let si = 0; const stepTimer = setInterval(() => { const el = $("stepTxt"); if (!el) return clearInterval(stepTimer); si = Math.min(si+1, steps.length-1); el.textContent = steps[si]; }, 2500);
   try{
     const known = knownCharacters(book);
