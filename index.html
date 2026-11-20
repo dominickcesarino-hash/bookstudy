@@ -149,6 +149,29 @@
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
   .toast.on{opacity:1}
   [hidden]{display:none!important}
+
+  /* trending */
+  .trending{padding:28px 0 60px}
+  .trending h2{font-size:2rem}
+  .tbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:18px 0 20px}
+  .gchip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font-weight:800;font-size:.85rem;cursor:pointer;color:var(--muted)}
+  .gchip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .tsearch{flex:1;min-width:180px;max-width:320px;margin-left:auto}
+  .shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+  .tbook{display:flex;flex-direction:column;overflow:hidden}
+  .cover{height:150px;position:relative;padding:16px 16px 14px 26px;color:#fff;display:flex;flex-direction:column;justify-content:flex-end}
+  .cover:before{content:"";position:absolute;left:10px;top:0;bottom:0;width:4px;background:rgba(255,255,255,.35)}
+  .cover .rank{position:absolute;top:10px;right:12px;font-family:Fraunces,serif;font-weight:800;font-size:1.6rem;opacity:.55}
+  .cover b{font-family:Fraunces,serif;font-size:1.15rem;line-height:1.15}
+  .cover span{font-size:.8rem;opacity:.9;margin-top:4px}
+  .tbody{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .tbody p{margin:0;font-size:.88rem;color:#4a443c;flex:1}
+  .tmeta{display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-size:.72rem;font-weight:800;border-radius:999px;padding:2px 9px;background:#f3ede1;color:#6f675c}
+  .tag.hot{background:var(--accent-soft);color:#9a4718}
+  .study{border:0;border-radius:10px;padding:9px;background:var(--brand-soft);color:var(--brand);font-weight:800;cursor:pointer}
+  .study:hover{background:var(--brand);color:#fff}
+  @media (max-width:620px){.nav{gap:4px}.navbtn{padding:8px 7px;font-size:.88rem}.logo span{display:none}.pill{padding:6px 9px}}
 </style>
 </head>
 <body>
@@ -157,10 +180,11 @@
   <div class="wrap nav">
     <a class="logo" href="#summarize" data-view="summarize">
       <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="12" height="22" rx="2" fill="#2f5d50"/><rect x="17" y="5" width="12" height="22" rx="2" fill="#e07a3f"/><path d="M16 7v20" stroke="#fbf7ef" stroke-width="2"/><circle cx="23" cy="13" r="2.2" fill="#fff"/><circle cx="9" cy="13" r="2.2" fill="#fff"/></svg>
-      Chapter Buddy
+      <span>Chapter Buddy</span>
     </a>
     <div class="spacer"></div>
     <button class="navbtn on" data-view="summarize">Summarize</button>
+    <button class="navbtn" data-view="trending">🔥 Trending</button>
     <button class="navbtn" data-view="notebook">My Books</button>
     <button class="pill" id="premiumBtn">⭐ Go Premium</button>
   </div>
@@ -238,6 +262,20 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- TRENDING VIEW -->
+  <div id="view-trending" class="wrap trending" hidden>
+    <h2>🔥 Trending books</h2>
+    <p style="color:var(--muted);margin:6px 0 0">The books students are reading in class right now. Pick one to start studying it chapter by chapter.</p>
+    <div class="tbar">
+      <button class="gchip on" data-g="all">All grades</button>
+      <button class="gchip" data-g="3-5">Grades 3–5</button>
+      <button class="gchip" data-g="6-8">Grades 6–8</button>
+      <button class="gchip" data-g="9-12">Grades 9–12</button>
+      <input type="text" class="tsearch" id="tsearch" placeholder="Search title or author…">
+    </div>
+    <div class="shelf" id="shelf"></div>
   </div>
 
   <!-- NOTEBOOK VIEW -->
@@ -586,17 +624,89 @@ function renderNotebook(){
   });
 }
 
+/* ===================== TRENDING ===================== */
+// g = grade band used for the filter and the "Explain it for" setting
+const TRENDING = [
+  {t:"Wonder", a:"R. J. Palacio", g:"3-5", hot:true, d:"Auggie starts middle school for the first time, and everyone has to learn what it means to choose kind."},
+  {t:"The Wild Robot", a:"Peter Brown", g:"3-5", hot:true, d:"A robot wakes up alone on a wild island and has to learn to survive among the animals."},
+  {t:"Charlotte's Web", a:"E. B. White", g:"3-5", d:"A spider named Charlotte comes up with a clever plan to save her friend Wilbur the pig."},
+  {t:"Because of Winn-Dixie", a:"Kate DiCamillo", g:"3-5", d:"A stray dog helps a lonely girl make friends in a small Florida town."},
+  {t:"The One and Only Ivan", a:"Katherine Applegate", g:"3-5", d:"A gorilla living in a shopping mall makes a promise that changes everything."},
+  {t:"Matilda", a:"Roald Dahl", g:"3-5", d:"A brilliant girl with awful parents and a terrifying headmistress discovers a special power."},
+  {t:"Diary of a Wimpy Kid", a:"Jeff Kinney", g:"3-5", d:"Greg Heffley tries (and mostly fails) to become popular in middle school."},
+  {t:"The Lightning Thief", a:"Rick Riordan", g:"6-8", hot:true, d:"Percy Jackson finds out he's the son of a Greek god and is sent on a quest across America."},
+  {t:"Holes", a:"Louis Sachar", g:"6-8", hot:true, d:"Stanley is sent to a desert camp where boys dig holes all day, and a family curse slowly unravels."},
+  {t:"The Giver", a:"Lois Lowry", g:"6-8", hot:true, d:"In a 'perfect' community, Jonas is chosen to hold its memories and learns the truth."},
+  {t:"Hatchet", a:"Gary Paulsen", g:"6-8", d:"After a plane crash, Brian must survive alone in the Canadian wilderness with only a hatchet."},
+  {t:"The Outsiders", a:"S. E. Hinton", g:"6-8", d:"Ponyboy and the Greasers clash with the Socs, and one night changes everything."},
+  {t:"Refugee", a:"Alan Gratz", g:"6-8", d:"Three kids from three different times flee danger in search of a safe home."},
+  {t:"New Kid", a:"Jerry Craft", g:"6-8", d:"A graphic novel about Jordan starting at a private school where he's one of the few kids of color."},
+  {t:"Number the Stars", a:"Lois Lowry", g:"6-8", d:"In Nazi-occupied Denmark, Annemarie helps protect her Jewish best friend."},
+  {t:"A Wrinkle in Time", a:"Madeleine L'Engle", g:"6-8", d:"Meg travels through space and time to rescue her missing father."},
+  {t:"The Hunger Games", a:"Suzanne Collins", g:"9-12", hot:true, d:"Katniss volunteers to take her sister's place in a televised fight to survive."},
+  {t:"To Kill a Mockingbird", a:"Harper Lee", g:"9-12", hot:true, d:"Scout watches her father defend a Black man falsely accused in a small Alabama town."},
+  {t:"Of Mice and Men", a:"John Steinbeck", g:"9-12", hot:true, d:"Two migrant workers chase the dream of owning a farm during the Great Depression."},
+  {t:"The Great Gatsby", a:"F. Scott Fitzgerald", g:"9-12", d:"Nick watches his mysterious neighbor Gatsby chase a dream in the 1920s."},
+  {t:"Lord of the Flies", a:"William Golding", g:"9-12", d:"Boys stranded on an island try to govern themselves, and it goes very wrong."},
+  {t:"Fahrenheit 451", a:"Ray Bradbury", g:"9-12", d:"In a future where books are burned, a fireman starts to question everything."},
+  {t:"Animal Farm", a:"George Orwell", g:"9-12", d:"Farm animals overthrow their farmer, but the new leaders become just as bad."},
+  {t:"Romeo and Juliet", a:"William Shakespeare", g:"9-12", d:"Two young people from feuding families fall in love, with tragic results."},
+  {t:"Night", a:"Elie Wiesel", g:"9-12", d:"A memoir of a teenage boy's survival in Nazi concentration camps."}
+];
+const gradeValue = {"3-5":"grades 3-5 (ages 8-10)","6-8":"grades 6-8 (ages 11-13)","9-12":"grades 9-12 (ages 14-18)"};
+let tGrade = "all";
+
+function renderTrending(){
+  const q = $("tsearch").value.trim().toLowerCase();
+  const list = TRENDING
+    .filter(b => tGrade === "all" || b.g === tGrade)
+    .filter(b => !q || (b.t + " " + b.a).toLowerCase().includes(q))
+    .sort((x,y) => (y.hot?1:0) - (x.hot?1:0));
+  if (!list.length){ $("shelf").innerHTML = `<div class="card empty" style="grid-column:1/-1"><h3>No books match</h3><p>Try another search, or type any book on the Summarize tab.</p></div>`; return; }
+  $("shelf").innerHTML = list.map((b,i) => {
+    const c = color(b.t), saved = books[bookKey(b.t)];
+    const n = saved ? Object.keys(saved.chapters).length : 0;
+    return `<div class="card tbook">
+      <div class="cover" style="background:linear-gradient(160deg, ${c}, ${c}cc)">
+        <div class="rank">#${i+1}</div><b>${esc(b.t)}</b><span>${esc(b.a)}</span>
+      </div>
+      <div class="tbody">
+        <div class="tmeta">${b.hot ? `<span class="tag hot">🔥 Trending</span>` : ""}<span class="tag">Grades ${b.g.replace("-","–")}</span>${n ? `<span class="tag">✓ ${n} ch. saved</span>` : ""}</div>
+        <p>${esc(b.d)}</p>
+        <button class="study" data-t="${esc(b.t)}">${n ? "Keep studying" : "Study this book"} →</button>
+      </div>
+    </div>`;
+  }).join("");
+  $("shelf").querySelectorAll(".study").forEach(btn => btn.onclick = () => studyBook(TRENDING.find(b => b.t === btn.dataset.t)));
+}
+function studyBook(b){
+  show("summarize");
+  $("book").value = b.t; $("author").value = b.a; $("grade").value = gradeValue[b.g];
+  const saved = books[bookKey(b.t)];
+  const next = saved ? Math.max(0, ...Object.values(saved.chapters).map(c => parseInt(c.chapter) || 0)) + 1 : 1;
+  $("chapter").value = next;
+  setTimeout(() => { $("chapter").focus(); $("chapter").select(); }, 350);
+  toast(`${b.t} is ready. Check the chapter number, then add the text.`);
+}
+document.querySelectorAll(".gchip").forEach(c => c.addEventListener("click", () => {
+  tGrade = c.dataset.g;
+  document.querySelectorAll(".gchip").forEach(x => x.classList.toggle("on", x === c));
+  renderTrending();
+}));
+$("tsearch").addEventListener("input", renderTrending);
+
 /* ===================== VIEWS / MODAL / TOAST ===================== */
 function show(v){
-  $("view-summarize").hidden = v !== "summarize";
-  $("view-notebook").hidden = v !== "notebook";
+  ["summarize","trending","notebook"].forEach(n => $("view-" + n).hidden = v !== n);
   document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   if (v === "notebook") renderNotebook();
+  if (v === "trending") renderTrending();
   try{ history.replaceState(null, "", "#" + v); }catch(e){}
   window.scrollTo({top:0, behavior:"smooth"});
 }
 document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", e => { e.preventDefault(); show(b.dataset.view); }));
-window.addEventListener("hashchange", () => show(location.hash === "#notebook" ? "notebook" : "summarize"));
+const viewFromHash = () => ({"#notebook":"notebook","#trending":"trending"})[location.hash] || "summarize";
+window.addEventListener("hashchange", () => show(viewFromHash()));
 
 function openModal(limitHit){
   document.querySelectorAll(".freeN").forEach(s => s.textContent = CONFIG.FREE_PER_DAY);
@@ -613,7 +723,7 @@ $("modal").addEventListener("click", e => { if (e.target.id === "modal") $("moda
 let tt; function toast(m){ const t = $("toast"); t.textContent = m; t.classList.add("on"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("on"), 2600); }
 
 refreshBookList(); renderQuota();
-if (location.hash === "#notebook") show("notebook");
+if (viewFromHash() !== "summarize") show(viewFromHash());
 </script>
 </body>
 </html>
