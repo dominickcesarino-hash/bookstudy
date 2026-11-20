@@ -8,11 +8,10 @@
 // Free-tier models, tried in order. If Google retires one, the next is used.
 // "think" keeps reasoning short so answers come back fast.
 const MODELS = [
-  { name: "gemini-2.5-flash",         think: { thinkingBudget: 512 } },
-  { name: "gemini-2.5-flash-lite",    think: { thinkingBudget: 512 } },
+  { name: "gemini-3.8-flash",         think: { thinkingLevel: "low" } },
+  { name: "gemini-3.5-flash-lite",    think: { thinkingLevel: "low" } },
   { name: "gemini-flash-latest",      think: { thinkingLevel: "low" } },
-  { name: "gemini-flash-lite-latest", think: null },
-  { name: "gemini-2.0-flash",         think: null }
+  { name: "gemini-flash-lite-latest", think: { thinkingLevel: "low" } }
 ];
 
 export async function onRequestPost({ request, env, waitUntil }) {
@@ -24,7 +23,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   const prompt = String(body.prompt || "").slice(0, 80000);
   const images = Array.isArray(body.images) ? body.images.slice(0, 8) : [];
-  const ground = body.ground === true && images.length === 0;
+  let ground = body.ground === true && images.length === 0;
   if (!prompt) return json({ error: "Missing prompt." }, 400);
 
   const parts = [{ text: prompt }];
@@ -48,22 +47,27 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const chosen = MODELS.filter(m => !body.model || m.name === body.model);
 
   let res, data, detail = "", used = "";
-  outer:
-  for (const model of chosen.length ? chosen : MODELS) {
-    // Try with the fast-thinking setting first; if this model rejects it (400), retry once without it.
-    for (const think of model.think ? [model.think, null] : [null]) {
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model.name}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: build(think)
-      });
-      if (res.ok) { used = model.name; break outer; }
-      try { detail = (await res.json()).error?.message || ""; } catch { detail = ""; }
-      if (res.status !== 400) break;
+  const attempt = async () => {
+    for (const model of chosen.length ? chosen : MODELS) {
+      // Try with the fast-thinking setting first; if this model rejects it (400), retry once without it.
+      for (const think of model.think ? [model.think, null] : [null]) {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model.name}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: build(think)
+        });
+        if (res.ok) { used = model.name; return; }
+        try { detail = (await res.json()).error?.message || ""; } catch { detail = ""; }
+        if (res.status !== 400) break;
+      }
+      // Move to the next model if this one is missing, incompatible, or out of free quota.
+      if (![400, 404, 429].includes(res.status)) return;
     }
-    // Move to the next model if this one is missing, incompatible, or out of free quota.
-    if (![400, 404, 429].includes(res.status)) break;
-  }
+  };
+  await attempt();
+  // If web search isn't available on the free quota, answer without it (the prompt's accuracy rules still apply).
+  const searched = ground && res.ok;
+  if (!res.ok && ground && [400, 429].includes(res.status)) { ground = false; await attempt(); }
 
   if (res.status === 429) return json({ error: "Lots of students are using Chapter Buddy right now. Try again in a minute.", detail: detail.slice(0, 300) }, 429);
   if (!res.ok) return json({ error: "The summarizer had a problem. Please try again.", detail: `${res.status} ${detail}`.slice(0, 300) }, 502);
@@ -84,7 +88,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const book = String(body.book || "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 80);
   if (book && env.STATS) waitUntil(countSummary(env.STATS, book).catch(() => {}));
 
-  return json({ text, sources, model: used, ms: Date.now() - started });
+  return json({ text, sources, searched, model: used, ms: Date.now() - started });
 }
 
 async function countSummary(kv, book) {
