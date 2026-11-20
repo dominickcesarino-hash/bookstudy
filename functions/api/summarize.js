@@ -7,11 +7,12 @@
 
 // Free-tier models, tried in order. If Google retires one, the next is used.
 // "think" keeps reasoning short so answers come back fast.
+// Speed test (Nov 2026): gemini-3.5-flash-lite answered in ~3s; gemini-3.8-flash took ~80s, so it's only a backup.
 const MODELS = [
-  { name: "gemini-3.8-flash",         think: { thinkingLevel: "low" } },
   { name: "gemini-3.5-flash-lite",    think: { thinkingLevel: "low" } },
-  { name: "gemini-flash-latest",      think: { thinkingLevel: "low" } },
-  { name: "gemini-flash-lite-latest", think: { thinkingLevel: "low" } }
+  { name: "gemini-flash-lite-latest", think: { thinkingLevel: "low" } },
+  { name: "gemini-3.8-flash",         think: { thinkingLevel: "low" } },
+  { name: "gemini-flash-latest",      think: { thinkingLevel: "low" } }
 ];
 
 export async function onRequestPost({ request, env, waitUntil }) {
@@ -48,7 +49,9 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   let res, data, detail = "", used = "";
   const attempt = async () => {
-    for (const model of chosen.length ? chosen : MODELS) {
+    const list = chosen.length ? chosen : MODELS;
+    // Web search is tried on the first model only; if it's unavailable we fall back to answering without it.
+    for (const model of ground ? list.slice(0, 1) : list) {
       // Try with the fast-thinking setting first; if this model rejects it (400), retry once without it.
       for (const think of model.think ? [model.think, null] : [null]) {
         res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model.name}:generateContent`, {
