@@ -377,7 +377,9 @@ function buildPrompt({book, author, chapter, grade, mode, text, known}){
     mode === "photo" ? `The attached images are photos of the chapter's pages, in order. Read them carefully and use ONLY what is on these pages.` :
                        `No text is provided. If you have a search tool, use it to find reliable chapter-by-chapter summaries of this exact chapter (study guides like SparkNotes, LitCharts, CliffsNotes, GradeSaver) and base everything on them. Otherwise rely only on what you reliably know about this book.
 Accuracy rules (very important):
-- Only include events, characters and details you can confirm from the sources for this specific chapter. Never invent or guess.
+- Only include events, characters and details you can confirm for this specific chapter. Never invent or guess.
+- Leaving a detail out is always better than getting it wrong. Do not mention place names, numbers, dates or minor details unless you are certain of them.
+- Only rate "confidence" as "high" if you know this book chapter by chapter; for less familiar books use "medium" or "low".
 - Do not mix up events from neighboring chapters. If sources disagree or number chapters differently (editions, parts, or named chapters), say so in "confidenceNote".
 - If you cannot confidently identify this chapter, set "confidence" to "low", keep the summary short and general, leave "keyEvents" and "newCharacters" empty, and explain in "confidenceNote".`;
   return `You are Chapter Buddy, a friendly reading tutor for students in ${grade}.
@@ -406,7 +408,8 @@ Include 4-7 key events in story order and 3-5 vocab words.`;
 }
 
 function parseJSON(t){
-  t = (t || "").trim().replace(/^```(?:json)?\s*/i,"").replace(/```\s*$/,"");
+  t = (t || "").trim().replace(/^```(?:json)?\s*/i,"").replace(/```\s*$/,"")
+    .replace(/__ESC_QUOT_?/g, '\\"'); // the model occasionally emits this placeholder instead of an escaped quote
   const a = t.indexOf("{"), b = t.lastIndexOf("}");
   if (a < 0 || b < 0) throw new Error("The summary came back in an unexpected format. Please try again.");
   return JSON.parse(t.slice(a, b+1));
@@ -484,9 +487,13 @@ $("form").addEventListener("submit", async e => {
   try{
     const known = knownCharacters(book);
     const prompt = buildPrompt({book, author, chapter, grade, mode, text: text.slice(0, 60000), known});
-    const raw = await callAI(prompt, mode === "photo" ? photos : [], book);
+    let result;
+    try { result = parseJSON(await callAI(prompt, mode === "photo" ? photos : [], book)); }
+    catch (e) { // one automatic retry if the answer came back garbled
+      if (!/format|JSON/i.test(e.message)) throw e;
+      result = parseJSON(await callAI(prompt, mode === "photo" ? photos : [], book));
+    }
     trendCounts = null; // refresh rankings next time Trending opens
-    const result = parseJSON(raw);
     if (lastSources.length) result.sources = lastSources;
     save(book, author, chapter, result);
     bump();
