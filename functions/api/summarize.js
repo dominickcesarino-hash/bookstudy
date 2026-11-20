@@ -2,7 +2,8 @@
 // Keeps your Gemini API key secret on the server (free tier from https://aistudio.google.com/apikey).
 // In Cloudflare: Pages project → Settings → Variables and Secrets → add GEMINI_API_KEY (type: Secret).
 
-const MODEL = "gemini-2.5-flash"; // free-tier model; change here if Google renames it
+// Free-tier models, tried in order. If Google retires one, the next is used.
+const MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
 
 export async function onRequestPost({ request, env }) {
   if (!env.GEMINI_API_KEY) return json({ error: "Server is missing GEMINI_API_KEY." }, 500);
@@ -21,18 +22,26 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts }],
-      generationConfig: { temperature: 0.4, responseMimeType: "application/json" }
-    })
+  const payload = JSON.stringify({
+    contents: [{ role: "user", parts }],
+    generationConfig: { temperature: 0.4, responseMimeType: "application/json" }
   });
 
+  let res, detail = "";
+  for (const model of MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+      body: payload
+    });
+    if (res.ok) break;
+    try { detail = (await res.json()).error?.message || ""; } catch { detail = ""; }
+    if (res.status !== 404) break; // only fall through to the next model if this one doesn't exist
+  }
+
   if (res.status === 429) return json({ error: "Lots of students are using Chapter Buddy right now. Try again in a minute." }, 429);
-  if (!res.ok) return json({ error: "The summarizer had a problem. Please try again." }, 502);
+  if (!res.ok) return json({ error: "The summarizer had a problem. Please try again.", detail: `${res.status} ${detail}`.slice(0, 300) }, 502);
 
   const data = await res.json();
   const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
